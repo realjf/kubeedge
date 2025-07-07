@@ -12,9 +12,10 @@ import (
 
 	"github.com/kubeedge/kubeedge/common/constants"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/cache"
 )
 
-//constant metatable name reference
+// constant metatable name reference
 const (
 	MetaTableName = "meta"
 )
@@ -30,6 +31,11 @@ type Meta struct {
 func SaveMeta(meta *Meta) error {
 	num, err := dbm.DBAccess.Insert(meta)
 	klog.V(4).Infof("Insert affected Num: %d, %v", num, err)
+	cache.ServiceAccountTokenCache.Store(&cache.ServiceAccountTokenMeta{
+		Key:   meta.Key,
+		Type:  meta.Type,
+		Value: meta.Value,
+	})
 	if err == nil || IsNonUniqueNameError(err) {
 		return nil
 	}
@@ -57,6 +63,11 @@ func DeleteMetaByKey(key string) error {
 func UpdateMeta(meta *Meta) error {
 	num, err := dbm.DBAccess.Update(meta) // will update all field
 	klog.V(4).Infof("Update affected Num: %d, %v", num, err)
+	cache.ServiceAccountTokenCache.Store(&cache.ServiceAccountTokenMeta{
+		Key:   meta.Key,
+		Type:  meta.Type,
+		Value: meta.Value,
+	})
 	return err
 }
 
@@ -64,6 +75,11 @@ func UpdateMeta(meta *Meta) error {
 func InsertOrUpdate(meta *Meta) error {
 	_, err := dbm.DBAccess.Raw("INSERT OR REPLACE INTO meta (key, type, value) VALUES (?,?,?)", meta.Key, meta.Type, meta.Value).Exec() // will update all field
 	klog.V(4).Infof("Update result %v", err)
+	cache.ServiceAccountTokenCache.Store(&cache.ServiceAccountTokenMeta{
+		Key:   meta.Key,
+		Type:  meta.Type,
+		Value: meta.Value,
+	})
 	return err
 }
 
@@ -90,6 +106,17 @@ func QueryMeta(key string, condition string) (*[]string, error) {
 	}
 
 	var result []string
+	if len(*meta) == 0 {
+		// load from cache
+		caches := cache.ServiceAccountTokenCache.Load(condition)
+		if len(caches) > 0 {
+			for _, v := range caches {
+				result = append(result, v.Value)
+			}
+			return &result, nil
+		}
+	}
+
 	for _, v := range *meta {
 		result = append(result, v.Value)
 	}
@@ -102,6 +129,20 @@ func QueryAllMeta(key string, condition string) (*[]Meta, error) {
 	_, err := dbm.DBAccess.QueryTable(MetaTableName).Filter(key, condition).All(meta)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(*meta) == 0 {
+		// load from cache
+		caches := cache.ServiceAccountTokenCache.Load(condition)
+		if len(caches) > 0 {
+			for _, v := range caches {
+				*meta = append(*meta, Meta{
+					Key:   v.Key,
+					Type:  v.Type,
+					Value: v.Value,
+				})
+			}
+		}
 	}
 
 	return meta, nil

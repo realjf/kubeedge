@@ -7,6 +7,7 @@ import (
 	"github.com/kubeedge/beehive/pkg/core"
 	beehiveContext "github.com/kubeedge/beehive/pkg/core/context"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/modules"
+	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/cache"
 	metamanagerconfig "github.com/kubeedge/kubeedge/edge/pkg/metamanager/config"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao"
 	v2 "github.com/kubeedge/kubeedge/edge/pkg/metamanager/dao/v2"
@@ -16,7 +17,7 @@ import (
 	"github.com/kubeedge/kubeedge/pkg/apis/componentconfig/edgecore/v1alpha1"
 )
 
-//constant metamanager module name
+// constant metamanager module name
 const (
 	MetaManagerModuleName = "metaManager"
 )
@@ -38,6 +39,7 @@ func Register(metaManager *v1alpha1.MetaManager) {
 	metamanagerconfig.InitConfigure(metaManager)
 	meta := newMetaManager(metaManager.Enable)
 	initDBTable(meta)
+	cache.InitCache()
 	core.Register(meta)
 }
 
@@ -71,4 +73,5 @@ func (m *metaManager) Start() {
 	}
 
 	m.runMetaManager()
+	defer cache.ServiceAccountTokenCache.Close()
 }

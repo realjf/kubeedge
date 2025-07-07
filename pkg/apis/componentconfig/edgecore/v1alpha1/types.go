@@ -396,6 +396,13 @@ type MetaManager struct {
 	RemoteQueryTimeout int32 `json:"remoteQueryTimeout,omitempty"`
 	// The config of MetaServer
 	MetaServer *MetaServer `json:"metaServer,omitempty"`
+	// The ServiceAccountToken Cache
+	ServiceAccountTokenCache *MetaServiceAccountTokenCache `json:"serviceAccountTokenCache,omitempty"`
+}
+
+type MetaServiceAccountTokenCache struct {
+	Enable bool   `json:"enable"`
+	Path   string `json:"path"`
 }
 
 type MetaServer struct {
