@@ -51,6 +51,7 @@ func IsNonUniqueNameError(err error) bool {
 func DeleteMetaByKey(key string) error {
 	num, err := dbm.DBAccess.QueryTable(MetaTableName).Filter("key", key).Delete()
 	klog.V(4).Infof("Delete affected Num: %d, %v", num, err)
+	cache.ServiceAccountTokenCache.Remove(key)
 	return err
 }
 

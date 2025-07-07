@@ -62,6 +62,16 @@ func initCache() (cacheFile *os.File) {
 	return f
 }
 
+func (s *serviceAccountTokenCache) Remove(key string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if _, ok := s.metaList[key]; ok {
+		delete(s.metaList, key)
+	}
+	s.save()
+}
+
 func (s *serviceAccountTokenCache) Store(meta *ServiceAccountTokenMeta) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -73,6 +83,10 @@ func (s *serviceAccountTokenCache) Store(meta *ServiceAccountTokenMeta) {
 	}
 
 	s.metaList[meta.Key] = meta
+	s.save()
+}
+
+func (s *serviceAccountTokenCache) save() {
 	data := make([]*ServiceAccountTokenMeta, 0)
 	for _, v := range s.metaList {
 		data = append(data, &ServiceAccountTokenMeta{
