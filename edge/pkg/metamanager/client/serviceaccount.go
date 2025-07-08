@@ -54,11 +54,12 @@ func (c *serviceAccountToken) DeleteServiceAccountToken(podUID types.UID) {
 			continue
 		}
 		if podUID == tr.Spec.BoundObjectRef.UID {
-			err := dao.DeleteMetaByKey(sa.Key)
-			if err != nil {
-				klog.Errorf("delete meta %s failed: %v", sa.Key, err)
-				return
-			}
+			// todo: cannot be deleted
+			// err := dao.DeleteMetaByKey(sa.Key)
+			// if err != nil {
+			// 	klog.Errorf("delete meta %s failed: %v", sa.Key, err)
+			// 	return
+			// }
 		}
 	}
 }
@@ -101,33 +102,28 @@ func KeyFunc(name, namespace string, tr *authenticationv1.TokenRequest) string {
 	return fmt.Sprintf("%q/%q/%#v/%#v/%#v", name, namespace, tr.Spec.Audiences, exp, ref)
 }
 
-func getTokenLocally(name, namespace string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func getTokenLocally(name, namespace string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, string, error) {
 	resKey := KeyFunc(name, namespace, tr)
 	metas, err := dao.QueryMeta("key", resKey)
+	expiredKey := ""
 	if err != nil {
 		klog.Errorf("query meta %s failed: %v", resKey, err)
-		return nil, err
+		return nil, expiredKey, err
 	}
 	if len(*metas) != 1 {
 		klog.Errorf("query meta %s length error", resKey)
-		return nil, fmt.Errorf("query meta %s length error", resKey)
+		return nil, expiredKey, fmt.Errorf("query meta %s length error", resKey)
 	}
 	var tokenRequest authenticationv1.TokenRequest
 	err = json.Unmarshal([]byte((*metas)[0]), &tokenRequest)
 	if err != nil {
 		klog.Errorf("unmarshal resource %s token request failed: %v", resKey, err)
-		return nil, err
+		return nil, expiredKey, err
 	}
 	if requiresRefresh(&tokenRequest) {
-		err := dao.DeleteMetaByKey(resKey)
-		if err != nil {
-			klog.Errorf("delete meta %s failed: %v", resKey, err)
-			return nil, err
-		}
-		klog.Errorf("resource %s token expired", resKey)
-		return nil, fmt.Errorf("resource %s token expired", resKey)
+		expiredKey = resKey
 	}
-	return &tokenRequest, nil
+	return &tokenRequest, expiredKey, nil
 }
 
 func getTokenRemotely(resource string, tr *authenticationv1.TokenRequest, c *serviceAccountToken) (*authenticationv1.TokenRequest, error) {
@@ -151,10 +147,19 @@ func getTokenRemotely(resource string, tr *authenticationv1.TokenRequest, c *ser
 }
 
 func (c *serviceAccountToken) GetServiceAccountToken(namespace string, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	tokenReq, err := getTokenLocally(name, namespace, tr)
+	tokenReq, expiredKey, err := getTokenLocally(name, namespace, tr)
 	if err != nil {
 		resource := fmt.Sprintf("%s/%s/%s", namespace, model.ResourceTypeServiceAccountToken, name)
-		return getTokenRemotely(resource, tr, c)
+		tokenReq, err = getTokenRemotely(resource, tr, c)
+		if err == nil {
+			err := dao.DeleteMetaByKey(expiredKey)
+			if err != nil {
+				klog.Errorf("delete meta %s failed: %v", expiredKey, err)
+			} else {
+				klog.Errorf("resource %s token expired", expiredKey)
+			}
+		}
+		return tokenReq, err
 	}
 	return tokenReq, nil
 }
