@@ -107,7 +107,7 @@ func QueryMeta(key string, condition string) (*[]string, error) {
 	}
 
 	var result []string
-	if len(*meta) == 0 {
+	if len(*meta) == 0 && key == "key" {
 		// load from cache
 		caches := cache.ServiceAccountTokenCache.Load(condition)
 		if len(caches) > 0 {
@@ -132,7 +132,7 @@ func QueryAllMeta(key string, condition string) (*[]Meta, error) {
 		return nil, err
 	}
 
-	if len(*meta) == 0 {
+	if len(*meta) == 0 && key == "key" {
 		// load from cache
 		caches := cache.ServiceAccountTokenCache.Load(condition)
 		if len(caches) > 0 {
