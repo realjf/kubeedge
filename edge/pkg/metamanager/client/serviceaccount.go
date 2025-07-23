@@ -122,6 +122,7 @@ func getTokenLocally(name, namespace string, tr *authenticationv1.TokenRequest) 
 	}
 	if requiresRefresh(&tokenRequest) {
 		expiredKey = resKey
+		return &tokenRequest, expiredKey, fmt.Errorf("token %s has been expired", resKey)
 	}
 	return &tokenRequest, expiredKey, nil
 }
@@ -150,7 +151,7 @@ func (c *serviceAccountToken) GetServiceAccountToken(namespace string, name stri
 	tokenReq, expiredKey, err := getTokenLocally(name, namespace, tr)
 	if err != nil {
 		resource := fmt.Sprintf("%s/%s/%s", namespace, model.ResourceTypeServiceAccountToken, name)
-		tokenReq, err = getTokenRemotely(resource, tr, c)
+		tokenReq2, err := getTokenRemotely(resource, tr, c)
 		if err == nil {
 			err := dao.DeleteMetaByKey(expiredKey)
 			if err != nil {
@@ -158,8 +159,9 @@ func (c *serviceAccountToken) GetServiceAccountToken(namespace string, name stri
 			} else {
 				klog.Errorf("resource %s token expired", expiredKey)
 			}
+			return tokenReq2, nil
 		}
-		return tokenReq, err
+		return tokenReq, nil
 	}
 	return tokenReq, nil
 }
